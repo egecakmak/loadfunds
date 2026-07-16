@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>LoadFunds · Live Metrics</title>
+<style>
+  :root {
+    --bg: #0e1117; --panel: #161b22; --border: #272e3a; --txt: #e6edf3;
+    --muted: #8b949e; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--txt);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--panel);
+    position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header h1 span { color: var(--accent); }
+  .status { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .dot.stale { background: var(--bad); }
+  .spacer { flex: 1; }
+  button, select, input { background: #21262d; color: var(--txt); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+  input { cursor: text; }
+  input[type="checkbox"] { width: 14px; height: 14px; padding: 0; accent-color: var(--accent); cursor: pointer; }
+  .check { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { border-color: var(--accent); }
+  main { padding: 20px; display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .tile .value { font-size: 28px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .sub { color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile.wide { grid-column: span 2; }
+  .row { display: flex; gap: 14px; margin-top: 6px; }
+  .row > div { flex: 1; }
+  .row .n { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .row .k { font-size: 11px; color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  canvas { width: 100%; height: 46px; display: block; margin-top: 8px; }
+  .section { grid-column: 1 / -1; color: var(--muted); font-size: 11px; text-transform: uppercase;
+    letter-spacing: .06em; margin: 6px 0 -6px; display: flex; align-items: center; gap: 12px; }
+  .section .spacer { flex: 1; }
+  .panel { grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    border-bottom: 1px solid var(--border); }
+  .panel-head .t { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  /* logs */
+  #logs { margin: 0; padding: 10px 14px; height: 340px; overflow: auto; font-size: 12px;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap;
+    word-break: break-word; line-height: 1.45; }
+  #logs .l { display: block; }
+  #logs .TRACE { color: #6e7681; } #logs .DEBUG { color: #8b949e; }
+  #logs .INFO { color: #adbac7; } #logs .WARN { color: var(--warn); }
+  #logs .ERROR { color: var(--bad); }
+  /* all metrics */
+  .mgrid { padding: 12px 14px; display: grid; gap: 4px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .mgroup { break-inside: avoid; margin-bottom: 8px; }
+  .mgroup h4 { margin: 8px 0 4px; font-size: 11px; text-transform: uppercase; color: var(--accent);
+    letter-spacing: .05em; }
+  .mrow { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0;
+    font-size: 12px; border-bottom: 1px dashed #21262d; }
+  .mrow .mn { color: var(--muted); font-family: ui-monospace, monospace; }
+  .mrow .mv { color: var(--txt); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .overlay { position: fixed; top: 58px; right: 16px; z-index: 50; display: none; }
+  .overlay.open { display: block; }
+  .dialog { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 18px 60px rgba(0, 0, 0, .45); }
+  .dialog-head, .dialog-actions { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    border-bottom: 1px solid var(--border); }
+  .dialog-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+  .dialog-actions { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+  .form { display: grid; gap: 10px; padding: 14px; }
+  .field { display: grid; gap: 5px; }
+  .field label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .field input, .field select { width: 100%; }
+  @media (max-width: 520px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .tile.wide { grid-column: span 1; }
+    .mgrid { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Load<span>Funds</span> · live</h1>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">connecting…</span></div>
+  <div class="spacer"></div>
+  <button id="btnLoad" title="Sends one POST /funds request with a random load id, random customer, random $10-$409 amount, and the browser's current timestamp.">Send 1 load</button>
+  <button id="btnBurst" title="Picks one random customer, then sends 20 POST /funds requests for that customer at 40 ms intervals. Each request gets its own random id, amount, and timestamp.">Send burst ×20</button>
+  <button id="btnRepeat" title="Open a compact request form with prefilled values so you can send one or more loads for the same customer.">Send custom</button>
+  <button id="btnPause" title="Pauses or resumes dashboard polling. It stops refreshing metrics and log tail data, but it does not stop the service or any requests already sent.">Pause</button>
+</header>
+
+<div class="overlay" id="requestOverlay" role="dialog" aria-labelledby="requestTitle">
+  <div class="dialog">
+    <div class="dialog-head">
+      <h2 id="requestTitle">Repeat customer requests</h2>
+      <div class="spacer"></div>
+      <button id="btnCloseRequest" title="Close without sending">Close</button>
+    </div>
+    <div class="form">
+      <div class="field">
+        <label for="repeatCustomer">Customer</label>
+        <select id="repeatCustomer"></select>
+      </div>
+      <div class="field">
+        <label for="repeatAmount">Load amount</label>
+        <input id="repeatAmount" value="$25.00" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="repeatCount">Requests</label>
+        <input id="repeatCount" type="number" min="1" max="100" value="3">
+      </div>
+      <div class="field">
+        <label for="repeatDelay">Delay between requests, ms</label>
+        <input id="repeatDelay" type="number" min="0" max="10000" value="40">
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button id="btnSendRepeat" class="primary" title="Sends the configured number of POST /funds requests for the selected customer. Each request gets a new load id and current timestamp.">Send requests</button>
+    </div>
+  </div>
+</div>
+
+<main id="grid">
+  <div class="section">Business — decisions</div>
+  <div class="tile wide">
+    <div class="label">Decisions / sec</div>
+    <div class="value" id="decRate">–</div>
+    <canvas id="sparkDec"></canvas>
+  </div>
+  <div class="tile">
+    <div class="label">Outcomes (total)</div>
+    <div class="row">
+      <div><div class="n ok" id="cAcc">0</div><div class="k">accepted</div></div>
+      <div><div class="n bad" id="cDec">0</div><div class="k">declined</div></div>
+      <div><div class="n warn" id="cDup">0</div><div class="k">duplicate</div></div>
+    </div>
+  </div>
+  <div class="tile">
+    <div class="label">Decide latency</div>
+    <div class="value" id="decMean">– ms</div>
+    <div class="sub">max <span id="decMax">–</span> ms · n=<span id="decN">0</span></div>
+    <canvas id="sparkLat"></canvas>
+  </div>
+  <div class="tile">
+    <div class="label">Avg load amount</div>
+    <div class="value" id="amtAvg">$–</div>
+    <div class="sub">n=<span id="amtN">0</span> · max $<span id="amtMax">–</span></div>
+  </div>
+  <div class="tile">
+    <div class="label">Lock wait (avg)</div>
+    <div class="value" id="lockMean">– ms</div>
+    <div class="sub">max <span id="lockMax">–</span> ms</div>
+  </div>
+
+  <div class="section">Infrastructure</div>
+  <div class="tile">
+    <div class="label">HikariCP connections</div>
+    <div class="row">
+      <div><div class="n" id="hkActive">0</div><div class="k">active</div></div>
+      <div><div class="n" id="hkIdle">0</div><div class="k">idle</div></div>
+      <div><div class="n" id="hkPend">0</div><div class="k">pending</div></div>
+    </div>
+    <canvas id="sparkPool"></canvas>
+  </div>
+  <div class="tile" id="tomcatThreadsTile">
+    <div class="label">Tomcat worker threads</div>
+    <div class="row">
+      <div><div class="n" id="tcBusy">0</div><div class="k">busy</div></div>
+      <div><div class="n" id="tcCurrent">0</div><div class="k">current</div></div>
+      <div><div class="n" id="tcMax">0</div><div class="k">maximum</div></div>
+    </div>
+    <div class="sub"><span id="tcUtil">0%</span> worker utilization</div>
+  </div>
+  <div class="tile">
+    <div class="label">HTTP requests</div>
+    <div class="value" id="httpN">0</div>
+    <div class="sub"><span class="bad" id="http5xx">0</span> server errors</div>
+  </div>
+  <div class="tile">
+    <div class="label">JVM heap used</div>
+    <div class="value" id="heap">– MB</div>
+  </div>
+  <div class="tile">
+    <div class="label">Hibernate</div>
+    <div class="row">
+      <div><div class="n" id="hbTx">0</div><div class="k">txns</div></div>
+      <div><div class="n" id="hbStmt">0</div><div class="k">statements</div></div>
+    </div>
+  </div>
+
+  <div class="section">Latency by layer (avg, cumulative)</div>
+  <div class="tile">
+    <div class="label">Controller</div>
+    <div class="value" id="latCtrl">– ms</div>
+    <div class="sub">loadfunds.controller</div>
+  </div>
+  <div class="tile">
+    <div class="label">Service</div>
+    <div class="value" id="latSvc">– ms</div>
+    <div class="sub">loadfunds.decide</div>
+  </div>
+  <div class="tile wide">
+    <div class="label">Repository latency — per method</div>
+    <div id="repoLat" class="sub" style="margin-top:8px">–</div>
+  </div>
+
+  <!-- LOGS -->
+  <div class="section">Logs</div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t">logs/loadfunds.log · live tail</span>
+      <div class="spacer"></div>
+      <label class="t" for="lvl">root level</label>
+      <select id="lvl" title="Sets the root logger level at runtime (via /actuator/loggers) and filters the view">
+        <option>TRACE</option><option>DEBUG</option><option>INFO</option>
+        <option>WARN</option><option>ERROR</option>
+      </select>
+      <label class="t check"><input id="appLogs" type="checkbox">ca.venn only</label>
+    </div>
+    <pre id="logs">loading…</pre>
+  </div>
+
+  <!-- ALL METRICS -->
+  <div class="section">All metrics
+    <div class="spacer"></div>
+    <input id="mFilter" placeholder="filter by name…" style="text-transform:none">
+  </div>
+  <div class="panel">
+    <div class="mgrid" id="allMetrics">loading…</div>
+  </div>
+</main>
+
+<script>
+const A = "/actuator/metrics/";
+const customers = ["alice", "bob", "carol", "dave"];
+const LEVELS = { TRACE:0, DEBUG:1, INFO:2, WARN:3, ERROR:4 };
+
+async function metric(name, tags) {
+  let url = A + encodeURIComponent(name);
+  if (tags) url += "?" + Object.entries(tags).map(([k,v]) => "tag=" + k + ":" + v).join("&");
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const out = {};
+    for (const m of j.measurements) out[m.statistic] = m.value;
+    return out;
+  } catch { return null; }
+}
+const val = (m, s, d=0) => (m && m[s] != null) ? m[s] : d;
+const meanMs = m => (m && m.COUNT) ? (m.TOTAL_TIME / m.COUNT) * 1000 : 0;   // cumulative mean latency
+
+// ============ HERO TILES ============
+const hist = { dec: [], lat: [], pool: [] };
+function push(key, v) { const a = hist[key]; a.push(v); if (a.length > 60) a.shift(); }
+function drawSpark(id, data, color) {
+  const c = document.getElementById(id); if (!c) return;
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  c.width = w*dpr; c.height = h*dpr;
+  const ctx = c.getContext("2d"); ctx.scale(dpr, dpr); ctx.clearRect(0,0,w,h);
+  if (data.length < 2) return;
+  const max = Math.max(...data, 1), min = Math.min(...data, 0), span = (max-min) || 1;
+  ctx.beginPath();
+  data.forEach((v,i) => { const x=(i/(data.length-1))*w, y=h-((v-min)/span)*(h-4)-2; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); ctx.fillStyle = color+"22"; ctx.fill();
+}
+
+let prev = null, prevT = 0, paused = false;
+
+async function tickHero() {
+  if (paused) return;
+  const now = Date.now();
+  const [decT, acc, dec, dup, decide, amt, lock, hkA, hkI, hkP, tcBusy, tcCurrent, tcMax,
+         httpAll, http5, heapM, hbTx, hbStmt, ctrl] =
+    await Promise.all([
+      metric("loadfunds.decisions"),
+      metric("loadfunds.decisions", {outcome:"accepted"}),
+      metric("loadfunds.decisions", {outcome:"declined"}),
+      metric("loadfunds.decisions", {outcome:"duplicate"}),
+      metric("loadfunds.decide"), metric("loadfunds.customer.lock"),
+      metric("hikaricp.connections.active"), metric("hikaricp.connections.idle"), metric("hikaricp.connections.pending"),
+      metric("tomcat.threads.busy"), metric("tomcat.threads.current"), metric("tomcat.threads.config.max"),
+      metric("http.server.requests"), metric("http.server.requests", {outcome:"SERVER_ERROR"}),
+      metric("jvm.memory.used", {area:"heap"}), metric("hibernate.transactions"), metric("hibernate.statements"),
+      metric("loadfunds.controller"),
+    ]);
+
+  const reachable = heapM !== null;   // gauge always present once app is up
+  document.getElementById("dot").className = "dot" + (reachable ? "" : " stale");
+  document.getElementById("statusText").textContent =
+    reachable ? "live · " + new Date().toLocaleTimeString() : "actuator unreachable";
+  if (!reachable) return;
+
+  const cur = { decCount: val(decT,"COUNT"), decTime: val(decide,"TOTAL_TIME"), decN: val(decide,"COUNT"),
+                amtTotal: val(amt,"TOTAL"), amtN: val(amt,"COUNT") };
+  document.getElementById("cAcc").textContent = Math.round(val(acc,"COUNT"));
+  document.getElementById("cDec").textContent = Math.round(val(dec,"COUNT"));
+  document.getElementById("cDup").textContent = Math.round(val(dup,"COUNT"));
+
+  const dt = prev ? (now - prevT)/1000 : 0;
+  let decRate = 0, latMs = 0, amtAvg = 0;
+  if (prev && dt > 0) {
+    decRate = Math.max(0, (cur.decCount - prev.decCount)/dt);
+    const dN = cur.decN-prev.decN, dTime = cur.decTime-prev.decTime;
+    latMs = dN > 0 ? (dTime/dN)*1000 : 0;
+    const dAmtN = cur.amtN-prev.amtN, dAmt = cur.amtTotal-prev.amtTotal;
+    amtAvg = dAmtN > 0 ? (dAmt/dAmtN) : (cur.amtN>0 ? cur.amtTotal/cur.amtN : 0);
+  } else if (cur.amtN > 0) { amtAvg = cur.amtTotal/cur.amtN; latMs = cur.decN>0 ? (cur.decTime/cur.decN)*1000 : 0; }
+
+  document.getElementById("decRate").textContent = decRate.toFixed(1);
+  document.getElementById("decMean").textContent = latMs.toFixed(1) + " ms";
+  document.getElementById("decMax").textContent = (val(decide,"MAX")*1000).toFixed(1);
+  document.getElementById("decN").textContent = Math.round(cur.decN);
+  document.getElementById("amtAvg").textContent = "$" + (amtAvg/100).toFixed(2);
+  document.getElementById("amtN").textContent = Math.round(cur.amtN);
+  document.getElementById("amtMax").textContent = (val(amt,"MAX")/100).toFixed(2);
+  document.getElementById("lockMean").textContent =
+    (val(lock,"COUNT") ? (val(lock,"TOTAL_TIME")/val(lock,"COUNT")*1000) : 0).toFixed(2) + " ms";
+  document.getElementById("lockMax").textContent = (val(lock,"MAX")*1000).toFixed(2);
+  const active = val(hkA,"VALUE"), pend = val(hkP,"VALUE");
+  document.getElementById("hkActive").textContent = active;
+  document.getElementById("hkIdle").textContent = val(hkI,"VALUE");
+  document.getElementById("hkPend").textContent = pend;
+  document.getElementById("hkPend").className = "n" + (pend > 0 ? " bad" : "");
+  const busyThreads = val(tcBusy,"VALUE"), currentThreads = val(tcCurrent,"VALUE"), maxThreads = val(tcMax,"VALUE");
+  const threadUtil = maxThreads > 0 ? busyThreads / maxThreads : 0;
+  document.getElementById("tcBusy").textContent = busyThreads;
+  document.getElementById("tcCurrent").textContent = currentThreads;
+  document.getElementById("tcMax").textContent = maxThreads;
+  document.getElementById("tcBusy").className = "n" + (threadUtil >= 0.8 ? " bad" : threadUtil >= 0.5 ? " warn" : "");
+  document.getElementById("tcUtil").textContent = (threadUtil * 100).toFixed(0) + "%";
+  document.getElementById("http5xx").textContent = Math.round(val(http5,"COUNT"));
+  document.getElementById("httpN").textContent = Math.round(val(httpAll,"COUNT"));
+  document.getElementById("heap").textContent = (val(heapM,"VALUE")/1048576).toFixed(0) + " MB";
+  document.getElementById("hbTx").textContent = Math.round(val(hbTx,"COUNT"));
+  document.getElementById("hbStmt").textContent = Math.round(val(hbStmt,"COUNT"));
+  document.getElementById("latCtrl").textContent = meanMs(ctrl).toFixed(2) + " ms";
+  document.getElementById("latSvc").textContent = meanMs(decide).toFixed(2) + " ms";
+
+  push("dec", decRate); push("lat", latMs); push("pool", active + pend);
+  drawSpark("sparkDec", hist.dec, "#58a6ff"); drawSpark("sparkLat", hist.lat, "#d29922"); drawSpark("sparkPool", hist.pool, "#3fb950");
+  prev = cur; prevT = now;
+}
+
+// ============ ALL METRICS ============
+let metricNames = [];
+async function loadMetricNames() {
+  try { const r = await fetch("/actuator/metrics"); metricNames = (await r.json()).names.sort(); } catch {}
+}
+function fmtVal(m) {
+  if (!m) return "–";
+  if ("VALUE" in m) return fmtNum(m.VALUE);
+  const parts = [];
+  if ("COUNT" in m) parts.push("n=" + Math.round(m.COUNT));
+  if ("TOTAL_TIME" in m) parts.push(fmtNum(m.TOTAL_TIME*1000) + "ms");
+  else if ("TOTAL" in m) parts.push("Σ" + fmtNum(m.TOTAL));
+  if ("MAX" in m) parts.push("max " + fmtNum("TOTAL_TIME" in m ? m.MAX*1000 : m.MAX));
+  return parts.join(" · ") || "–";
+}
+function fmtNum(v) {
+  if (v == null) return "–";
+  const a = Math.abs(v);
+  if (a >= 1e9) return (v/1e9).toFixed(2)+"G";
+  if (a >= 1e6) return (v/1e6).toFixed(2)+"M";
+  if (a >= 1e3) return (v/1e3).toFixed(1)+"k";
+  return (Number.isInteger(v) ? v : v.toFixed(2)).toString();
+}
+async function tickAllMetrics() {
+  if (paused || !metricNames.length) return;
+  const filter = document.getElementById("mFilter").value.trim().toLowerCase();
+  const names = filter ? metricNames.filter(n => n.toLowerCase().includes(filter)) : metricNames;
+  const values = await Promise.all(names.map(n => metric(n)));
+  const groups = {};
+  names.forEach((n, i) => { const g = n.split(".")[0]; (groups[g] ||= []).push([n, values[i]]); });
+  const el = document.getElementById("allMetrics");
+  el.innerHTML = Object.keys(groups).sort().map(g => `
+    <div class="mgroup"><h4>${g}</h4>${groups[g].map(([n,m]) =>
+      `<div class="mrow"><span class="mn">${n}</span><span class="mv">${fmtVal(m)}</span></div>`).join("")}</div>`
+  ).join("") || "<div class='mrow'>no matches</div>";
+}
+
+// ============ REPOSITORY LATENCY (per method) ============
+async function tickRepoLatency() {
+  if (paused) return;
+  let base;
+  try {
+    const r = await fetch("/actuator/metrics/spring.data.repository.invocations");
+    if (!r.ok) { document.getElementById("repoLat").textContent = "(no repository calls yet)"; return; }
+    base = await r.json();
+  } catch { return; }
+  const methodTag = (base.availableTags || []).find(t => t.tag === "method");
+  const methods = methodTag ? methodTag.values : [];
+  const rows = await Promise.all(methods.map(async m => {
+    const mm = await metric("spring.data.repository.invocations", { method: m });
+    return { m, mean: meanMs(mm), n: val(mm, "COUNT") };
+  }));
+  // include the dedicated lock timer alongside the Spring Data ones
+  const lockM = await metric("loadfunds.customer.lock");
+  if (lockM) rows.push({ m: "lock (customer)", mean: meanMs(lockM), n: val(lockM, "COUNT") });
+  rows.sort((a, b) => b.mean - a.mean);
+  document.getElementById("repoLat").innerHTML = rows.map(r =>
+    `<div class="mrow"><span class="mn">${r.m}</span><span class="mv">${r.mean.toFixed(2)} ms · n=${Math.round(r.n)}</span></div>`
+  ).join("") || "(none)";
+}
+
+// ============ LOGS ============
+let displayLevel = "DEBUG";
+const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const logLine = s => {
+  const m = s.match(/^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}:\d{2}\.\d{3})\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+(?:\[[^\]]+\]\s+)?(\S+)/);
+  return m ? { level: m[1], logger: m[2] } : null;
+};
+
+async function tickLogs() {
+  if (paused) return;
+  let text;
+  const appOnly = document.getElementById("appLogs").checked;
+  try {
+    const r = await fetch("/actuator/logfile", { headers: { Range: appOnly ? "bytes=-5000000" : "bytes=-40000" }, cache: "no-store" });
+    if (!r.ok && r.status !== 206 && r.status !== 200) throw 0;
+    text = await r.text();
+  } catch {
+    document.getElementById("logs").textContent = "logfile endpoint unavailable";
+    return;
+  }
+
+  let lines = text.split("\n");
+  if (lines.length > 1) lines.shift();          // drop the partial first line from the byte-range
+  const min = LEVELS[displayLevel];
+  let last = "INFO", lastApp = false;
+  const html = lines.filter(l => l.length).map(l => {
+    const meta = logLine(l);
+    const lv = meta ? meta.level : last;
+    const app = meta ? meta.logger.startsWith("ca.venn.") : lastApp;
+    last = lv; lastApp = app;
+    return { l, lv, app };
+  }).filter(x => LEVELS[x.lv] >= min && (!appOnly || x.app))
+    .map(x => `<span class="l ${x.lv}">${esc(x.l)}</span>`).join("");
+
+  const box = document.getElementById("logs");
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = html || "<span class='l'>(no lines at this level)</span>";
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function setRootLevel(lvl) {
+  displayLevel = lvl;
+  try {
+    await fetch("/actuator/loggers/ROOT", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ configuredLevel: lvl }),
+    });
+  } catch {}
+  tickLogs();
+}
+
+// ============ demo load generators ============
+function sendLoad(customer, amount) {
+  return fetch("/funds", { method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ id: crypto.randomUUID(),
+      customer_id: customer || customers[Math.floor(Math.random()*customers.length)],
+      load_amount: amount || "$" + (Math.floor(Math.random()*400)+10) + ".00", time: new Date().toISOString() }),
+  }).catch(()=>{});
+}
+function openRequestOverlay() {
+  document.getElementById("requestOverlay").classList.add("open");
+  document.getElementById("repeatCustomer").focus();
+}
+function closeRequestOverlay() {
+  document.getElementById("requestOverlay").classList.remove("open");
+}
+document.getElementById("btnLoad").onclick = () => sendLoad();
+document.getElementById("btnBurst").onclick = () => {
+  const c = customers[Math.floor(Math.random()*customers.length)];
+  for (let i = 0; i < 20; i++) setTimeout(() => sendLoad(c), i*40);
+};
+document.getElementById("btnRepeat").onclick = () => openRequestOverlay();
+document.getElementById("btnCloseRequest").onclick = () => closeRequestOverlay();
+document.getElementById("requestOverlay").onclick = (e) => { if (e.target.id === "requestOverlay") closeRequestOverlay(); };
+document.getElementById("btnSendRepeat").onclick = () => {
+  const customer = document.getElementById("repeatCustomer").value;
+  const amount = document.getElementById("repeatAmount").value.trim() || "$25.00";
+  const count = Math.max(1, Math.min(100, Number(document.getElementById("repeatCount").value) || 1));
+  const delay = Math.max(0, Math.min(10000, Number(document.getElementById("repeatDelay").value) || 0));
+  for (let i = 0; i < count; i++) setTimeout(() => sendLoad(customer, amount), i*delay);
+  closeRequestOverlay();
+};
+document.getElementById("btnPause").onclick = (e) => { paused = !paused; e.target.textContent = paused ? "Resume" : "Pause"; };
+document.getElementById("lvl").onchange = (e) => setRootLevel(e.target.value);
+document.getElementById("appLogs").onchange = () => tickLogs();
+document.getElementById("mFilter").oninput = () => tickAllMetrics();
+
+// ============ init ============
+(async () => {
+  document.getElementById("repeatCustomer").innerHTML = customers.map(c => `<option>${c}</option>`).join("");
+  await loadMetricNames();
+  try {
+    const r = await fetch("/actuator/loggers/ROOT");
+    const j = await r.json();
+    displayLevel = j.configuredLevel || j.effectiveLevel || "DEBUG";
+    document.getElementById("lvl").value = displayLevel;
+  } catch {}
+  tickHero(); tickLogs(); tickAllMetrics(); tickRepoLatency();
+  setInterval(tickHero, 2000);
+  setInterval(tickLogs, 2000);
+  setInterval(tickAllMetrics, 4000);
+  setInterval(tickRepoLatency, 3000);
+  setInterval(loadMetricNames, 20000);
+})();
+</script>
+</body>
+</html>
