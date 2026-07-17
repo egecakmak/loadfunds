@@ -128,6 +128,13 @@ class LoadFundsApiIntegrationTest {
     }
 
     @Test
+    void rejectsGetFundsAsMethodNotAllowed() throws Exception {
+        HttpResponse<String> response = get("/funds");
+
+        assertProblem(response, 405, "Only POST is supported");
+    }
+
+    @Test
     void rejectsInvalidRequestsWithoutLeakingInternalErrors() throws Exception {
         String customerId = unique("invalid-customer");
         HttpResponse<String> missingId = post(requestMissing("id"));

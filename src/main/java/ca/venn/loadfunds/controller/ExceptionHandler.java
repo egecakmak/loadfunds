@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -50,6 +51,19 @@ public class ExceptionHandler {
            .log("Malformed request body");
 
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Malformed JSON request");
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public ProblemDetail handleUnsupportedMethod(HttpRequestMethodNotSupportedException exception,
+                                                 HttpServletRequest request) {
+        log.atDebug()
+           .addKeyValue("path", request.getRequestURI())
+           .addKeyValue("method", request.getMethod())
+           .log("Unsupported request method");
+
+        return ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED,
+            "Only POST is supported for load funds requests");
     }
 
     @org.springframework.web.bind.annotation.ExceptionHandler(Exception.class)
