@@ -5,11 +5,13 @@ import ca.venn.loadfunds.model.loadfunds.LoadFundsOutcome;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Decorates {@link LoadFundsService} to record metrics.
  */
 @AllArgsConstructor
+@Slf4j
 public class MeteredLoadFundsService implements LoadFundsService {
 
     private static final String NONE = "none";
@@ -31,6 +33,11 @@ public class MeteredLoadFundsService implements LoadFundsService {
         } finally {
             sample.stop(registry.timer("loadfunds.decide", "outcome", outcome));
             registry.counter("loadfunds.decisions", "outcome", outcome, "reason", reason).increment();
+            log.atDebug()
+               .addKeyValue("loadFundsId", in.loadId())
+               .addKeyValue("outcome", outcome)
+               .addKeyValue("reason", reason)
+               .log("Load funds decision metrics recorded");
         }
     }
 
