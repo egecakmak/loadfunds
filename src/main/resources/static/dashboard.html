@@ -151,11 +151,6 @@
     <canvas id="sparkLat"></canvas>
   </div>
   <div class="tile">
-    <div class="label">Avg load amount</div>
-    <div class="value" id="amtAvg">$–</div>
-    <div class="sub">n=<span id="amtN">0</span> · max $<span id="amtMax">–</span></div>
-  </div>
-  <div class="tile">
     <div class="label">Lock wait (avg)</div>
     <div class="value" id="lockMean">– ms</div>
     <div class="sub">max <span id="lockMax">–</span> ms</div>
@@ -280,7 +275,7 @@ let prev = null, prevT = 0, paused = false;
 async function tickHero() {
   if (paused) return;
   const now = Date.now();
-  const [decT, acc, dec, dup, decide, amt, lock, hkA, hkI, hkP, tcBusy, tcCurrent, tcMax,
+  const [decT, acc, dec, dup, decide, lock, hkA, hkI, hkP, tcBusy, tcCurrent, tcMax,
          httpAll, http5, heapM, hbTx, hbStmt, ctrl] =
     await Promise.all([
       metric("loadfunds.decisions"),
@@ -301,29 +296,23 @@ async function tickHero() {
     reachable ? "live · " + new Date().toLocaleTimeString() : "actuator unreachable";
   if (!reachable) return;
 
-  const cur = { decCount: val(decT,"COUNT"), decTime: val(decide,"TOTAL_TIME"), decN: val(decide,"COUNT"),
-                amtTotal: val(amt,"TOTAL"), amtN: val(amt,"COUNT") };
+  const cur = { decCount: val(decT,"COUNT"), decTime: val(decide,"TOTAL_TIME"), decN: val(decide,"COUNT") };
   document.getElementById("cAcc").textContent = Math.round(val(acc,"COUNT"));
   document.getElementById("cDec").textContent = Math.round(val(dec,"COUNT"));
   document.getElementById("cDup").textContent = Math.round(val(dup,"COUNT"));
 
   const dt = prev ? (now - prevT)/1000 : 0;
-  let decRate = 0, latMs = 0, amtAvg = 0;
+  let decRate = 0, latMs = 0;
   if (prev && dt > 0) {
     decRate = Math.max(0, (cur.decCount - prev.decCount)/dt);
     const dN = cur.decN-prev.decN, dTime = cur.decTime-prev.decTime;
     latMs = dN > 0 ? (dTime/dN)*1000 : 0;
-    const dAmtN = cur.amtN-prev.amtN, dAmt = cur.amtTotal-prev.amtTotal;
-    amtAvg = dAmtN > 0 ? (dAmt/dAmtN) : (cur.amtN>0 ? cur.amtTotal/cur.amtN : 0);
-  } else if (cur.amtN > 0) { amtAvg = cur.amtTotal/cur.amtN; latMs = cur.decN>0 ? (cur.decTime/cur.decN)*1000 : 0; }
+  } else if (cur.decN > 0) { latMs = (cur.decTime/cur.decN)*1000; }
 
   document.getElementById("decRate").textContent = decRate.toFixed(1);
   document.getElementById("decMean").textContent = latMs.toFixed(1) + " ms";
   document.getElementById("decMax").textContent = (val(decide,"MAX")*1000).toFixed(1);
   document.getElementById("decN").textContent = Math.round(cur.decN);
-  document.getElementById("amtAvg").textContent = "$" + (amtAvg/100).toFixed(2);
-  document.getElementById("amtN").textContent = Math.round(cur.amtN);
-  document.getElementById("amtMax").textContent = (val(amt,"MAX")/100).toFixed(2);
   document.getElementById("lockMean").textContent =
     (val(lock,"COUNT") ? (val(lock,"TOTAL_TIME")/val(lock,"COUNT")*1000) : 0).toFixed(2) + " ms";
   document.getElementById("lockMax").textContent = (val(lock,"MAX")*1000).toFixed(2);

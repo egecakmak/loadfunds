@@ -16,23 +16,31 @@ file runner.
 ./gradlew bootRun
 ```
 
-The service listens on `http://localhost:8080`. Submit loads with
-`POST /funds`; health and operational endpoints are under `/actuator`.
-The HTTP response includes an `outcome` value: `ACCEPTED`, `DECLINED`,
-`DUPLICATE_ACCEPTED`, or `DUPLICATE_DECLINED`.
+## Build And Test
 
-## Run Integration Tests
-Run in another terminal:
+Build the application and run the standard test suite:
+
+```bash
+./gradlew test
+```
+
+Run the API integration tests against a running service:
+
+First start the service
+```bash
+./gradlew bootRun
+```
+
+In another terminal run the integration tests:
 
 ```bash
 ./gradlew integrationTest
 ```
 
-The standard suite includes unit and database integration tests:
-
-```bash
-./gradlew test
-```
+The service listens on `http://localhost:8080`. Submit loads with
+`POST /funds`; health and operational endpoints are under `/actuator`.
+The HTTP response includes an `outcome` value: `ACCEPTED`, `DECLINED`,
+`DUPLICATE_ACCEPTED`, or `DUPLICATE_DECLINED`.
 
 ## Replay A File Over HTTP
 
