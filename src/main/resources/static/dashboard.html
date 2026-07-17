@@ -151,6 +151,14 @@
     <canvas id="sparkLat"></canvas>
   </div>
   <div class="tile">
+    <div class="label">Service success/failure</div>
+    <div class="row">
+      <div><div class="n ok" id="svcSuccess">0</div><div class="k">success</div></div>
+      <div><div class="n bad" id="svcFailure">0</div><div class="k">failure</div></div>
+    </div>
+    <div class="sub">loadfunds.decisions</div>
+  </div>
+  <div class="tile">
     <div class="label">Lock wait (avg)</div>
     <div class="value" id="lockMean">– ms</div>
     <div class="sub">max <span id="lockMax">–</span> ms</div>
@@ -179,6 +187,14 @@
     <div class="label">HTTP requests</div>
     <div class="value" id="httpN">0</div>
     <div class="sub"><span class="bad" id="http5xx">0</span> server errors</div>
+  </div>
+  <div class="tile">
+    <div class="label">Controller success/failure</div>
+    <div class="row">
+      <div><div class="n ok" id="ctrlSuccess">0</div><div class="k">success</div></div>
+      <div><div class="n bad" id="ctrlFailure">0</div><div class="k">failure</div></div>
+    </div>
+    <div class="sub">loadfunds.controller</div>
   </div>
   <div class="tile">
     <div class="label">JVM heap used</div>
@@ -276,7 +292,7 @@ async function tickHero() {
   if (paused) return;
   const now = Date.now();
   const [decT, acc, dec, dup, decide, lock, hkA, hkI, hkP, tcBusy, tcCurrent, tcMax,
-         httpAll, http5, heapM, hbTx, hbStmt, ctrl] =
+         httpAll, http5, heapM, hbTx, hbStmt, ctrl, svcError, ctrlSuccess, ctrlError] =
     await Promise.all([
       metric("loadfunds.decisions"),
       metric("loadfunds.decisions", {outcome:"accepted"}),
@@ -288,6 +304,9 @@ async function tickHero() {
       metric("http.server.requests"), metric("http.server.requests", {outcome:"SERVER_ERROR"}),
       metric("jvm.memory.used", {area:"heap"}), metric("hibernate.transactions"), metric("hibernate.statements"),
       metric("loadfunds.controller"),
+      metric("loadfunds.decisions", {outcome:"error"}),
+      metric("loadfunds.controller", {outcome:"success"}),
+      metric("loadfunds.controller", {outcome:"error"}),
     ]);
 
   const reachable = heapM !== null;   // gauge always present once app is up
@@ -300,6 +319,9 @@ async function tickHero() {
   document.getElementById("cAcc").textContent = Math.round(val(acc,"COUNT"));
   document.getElementById("cDec").textContent = Math.round(val(dec,"COUNT"));
   document.getElementById("cDup").textContent = Math.round(val(dup,"COUNT"));
+  const serviceFailures = val(svcError, "COUNT");
+  document.getElementById("svcSuccess").textContent = Math.round(val(decT, "COUNT") - serviceFailures);
+  document.getElementById("svcFailure").textContent = Math.round(serviceFailures);
 
   const dt = prev ? (now - prevT)/1000 : 0;
   let decRate = 0, latMs = 0;
@@ -330,6 +352,8 @@ async function tickHero() {
   document.getElementById("tcUtil").textContent = (threadUtil * 100).toFixed(0) + "%";
   document.getElementById("http5xx").textContent = Math.round(val(http5,"COUNT"));
   document.getElementById("httpN").textContent = Math.round(val(httpAll,"COUNT"));
+  document.getElementById("ctrlSuccess").textContent = Math.round(val(ctrlSuccess,"COUNT"));
+  document.getElementById("ctrlFailure").textContent = Math.round(val(ctrlError,"COUNT"));
   document.getElementById("heap").textContent = (val(heapM,"VALUE")/1048576).toFixed(0) + " MB";
   document.getElementById("hbTx").textContent = Math.round(val(hbTx,"COUNT"));
   document.getElementById("hbStmt").textContent = Math.round(val(hbStmt,"COUNT"));
