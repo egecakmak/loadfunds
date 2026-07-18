@@ -37,10 +37,65 @@ In another terminal run the integration tests:
 ./gradlew integrationTest
 ```
 
-The service listens on `http://localhost:8080`. Submit loads with
-`POST /funds`; health and operational endpoints are under `/actuator`.
-The HTTP response includes an `outcome` value: `ACCEPTED`, `DECLINED`,
-`DUPLICATE_ACCEPTED`, or `DUPLICATE_DECLINED`.
+The service listens on `http://localhost:8080`. Health and operational endpoints
+are under `/actuator`.
+
+## HTTP API
+
+Submit a load-funds request:
+
+```http
+POST /funds
+Content-Type: application/json
+```
+
+```bash
+curl -X POST http://localhost:8080/funds \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": "load-123",
+    "customer_id": "customer-456",
+    "load_amount": "$100.00",
+    "time": "2026-07-16T12:00:00Z"
+  }'
+```
+
+Example response:
+
+```json
+{
+  "id": "load-123",
+  "customer_id": "customer-456",
+  "outcome": "ACCEPTED",
+  "rejection_reason": null
+}
+```
+
+`outcome` can be `ACCEPTED`, `DECLINED`, `DUPLICATE_ACCEPTED`, or
+`DUPLICATE_DECLINED`.
+
+To convert the HTTP response into the take-home output shape:
+
+```bash
+curl -s -X POST http://localhost:8080/funds \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": "27106",
+    "customer_id": "630",
+    "load_amount": "$100.00",
+    "time": "2026-07-16T12:00:00Z"
+  }' | jq -c 'select(.outcome != "DUPLICATE_ACCEPTED" and .outcome != "DUPLICATE_DECLINED") | {
+    id,
+    customer_id,
+    accepted: (.outcome == "ACCEPTED")
+  }'
+```
+
+Example converted output:
+
+```json
+{"id":"27106","customer_id":"630","accepted":true}
+```
 
 ## Replay A File Over HTTP
 
