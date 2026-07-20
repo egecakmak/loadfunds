@@ -77,8 +77,12 @@ public class LoadFundsServiceImpl implements LoadFundsService {
         Totals weekTotals = convertTotalsEntityToModel(weekTotalsEntity);
 
         log.atDebug()
+           .addKeyValue("dayWindowFrom", dayWindow.from())
+           .addKeyValue("dayWindowTo", dayWindow.to())
            .addKeyValue("dayUsedCents", dayTotals.amountCents())
            .addKeyValue("dayCount", dayTotals.loadCount())
+           .addKeyValue("weekWindowFrom", weekWindow.from())
+           .addKeyValue("weekWindowTo", weekWindow.to())
            .addKeyValue("weekUsedCents", weekTotals.amountCents())
            .log("Velocity totals computed");
 
@@ -92,6 +96,7 @@ public class LoadFundsServiceImpl implements LoadFundsService {
 
         log.atInfo()
            .addKeyValue("loadFundsId", in.loadId())
+           .addKeyValue("processedAt", in.processedAt())
            .addKeyValue("amountCents", in.amountCents())
            .addKeyValue("accepted", decision.accepted())
            .addKeyValue("reason", decision.reason())
